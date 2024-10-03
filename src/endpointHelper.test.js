@@ -1,4 +1,4 @@
-const { StatusCodeError } = require("../src/endpointHelper");
+const { StatusCodeError } = require("./endpointHelper");
 
 test("StatusCodeError Constructor because it shows up as untested", () => {
   const message = "We are habeen un serious problem";

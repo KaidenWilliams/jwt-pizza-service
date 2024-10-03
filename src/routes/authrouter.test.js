@@ -1,5 +1,5 @@
 const request = require("supertest");
-const app = require("../../src/service");
+const app = require("../service");
 
 const testUser = { name: "pizza diner", email: "reg@test.com", password: "a" };
 let testUserAuthToken;
@@ -10,8 +10,12 @@ beforeAll(async () => {
   testUserAuthToken = registerRes.body.token;
 });
 
+async function loginUser() {
+  return await request(app).put("/api/auth").send(testUser);
+}
+
 test("login", async () => {
-  const loginRes = await request(app).put("/api/auth").send(testUser);
+  const loginRes = await loginUser();
   expect(loginRes.status).toBe(200);
   expect(loginRes.body.token).toMatch(
     /^[a-zA-Z0-9\-_]*\.[a-zA-Z0-9\-_]*\.[a-zA-Z0-9\-_]*$/
@@ -19,4 +23,17 @@ test("login", async () => {
 
   const { password, ...user } = { ...testUser, roles: [{ role: "diner" }] };
   expect(loginRes.body.user).toMatchObject(user);
+});
+
+test("logout", async () => {
+  const loginRes = await loginUser();
+  const authToken = loginRes.body.token;
+
+  const logoutRes = await request(app)
+    .delete("/api/auth")
+    .set("Authorization", `Bearer ${authToken}`)
+    .send();
+
+  expect(logoutRes.status).toBe(200);
+  expect(logoutRes.body.message).toBe("logout successful");
 });
