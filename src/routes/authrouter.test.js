@@ -39,6 +39,11 @@ test("authToken should fail if not called with Bearer token in Authorization", (
   expect(res.status).toHaveBeenCalledWith(401);
 });
 
+test("register should throw if bad parameters are put in", async () => {
+  const registerRes = await request(app).post("/api/auth").send(null);
+  expect(registerRes.status).toBe(400);
+});
+
 test("login", async () => {
   const loginRes = await loginUser();
   expect(loginRes.status).toBe(200);
@@ -59,11 +64,13 @@ test("logout should be sucessful when provided authorization token", async () =>
     .set("Authorization", `Bearer ${authToken}`)
     .send();
 
-  expect(logoutRes.status).toBe(200);
-  expect(logoutRes.body.message).toBe("logout successful");
+  await expect(logoutRes.status).toBe(200);
+  await expect(logoutRes.body.message).toBe("logout successful");
 });
 
-test("");
+// test("update user sucessful updates user" () => {
+
+// });
 
 // Helper Functions
 async function loginUser() {
