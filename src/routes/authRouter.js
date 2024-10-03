@@ -79,8 +79,7 @@ async function setAuthUser(req, res, next) {
 
 // Authenticate token
 authRouter.authenticateToken = (req, res, next) => {
-  const authHeader = req.headers.authorization;
-  const token = authHeader ? authHeader.split(" ")[1] : null;
+  const token = readAuthToken(req);
 
   if (!token) {
     return res.status(401).send({ message: "unauthorized" });

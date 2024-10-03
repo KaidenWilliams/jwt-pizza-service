@@ -1,5 +1,6 @@
 const request = require("supertest");
 const app = require("../service");
+const { authRouter, setAuthUser } = require("./authRouter.js");
 
 const testUser = { name: "pizza diner", email: "reg@test.com", password: "a" };
 let testUserAuthToken;
@@ -10,9 +11,33 @@ beforeAll(async () => {
   testUserAuthToken = registerRes.body.token;
 });
 
-async function loginUser() {
-  return await request(app).put("/api/auth").send(testUser);
-}
+test("authUser should return a response with a not null user", () => {
+  const req = { headers: {} };
+  const res = {
+    status: jest.fn().mockReturnThis(),
+    send: jest.fn(),
+  };
+  const next = jest.fn();
+
+  jest.mock("../database/database.js", () => ({
+    DB: { isLoggedIn: jest.fn().mockResolvedValue(true) },
+  }));
+
+  setAuthUser(req, res, next);
+  expect(res.user).not.toBe(null);
+});
+
+test("authToken should fail if not called with Bearer token in Authorization", () => {
+  const req = { headers: {} };
+  const res = {
+    status: jest.fn().mockReturnThis(),
+    send: jest.fn(),
+  };
+  const next = jest.fn();
+
+  authRouter.authenticateToken(req, res, next);
+  expect(res.status).toHaveBeenCalledWith(401);
+});
 
 test("login", async () => {
   const loginRes = await loginUser();
@@ -25,7 +50,7 @@ test("login", async () => {
   expect(loginRes.body.user).toMatchObject(user);
 });
 
-test("logout", async () => {
+test("logout should be sucessful when provided authorization token", async () => {
   const loginRes = await loginUser();
   const authToken = loginRes.body.token;
 
@@ -37,3 +62,10 @@ test("logout", async () => {
   expect(logoutRes.status).toBe(200);
   expect(logoutRes.body.message).toBe("logout successful");
 });
+
+test("");
+
+// Helper Functions
+async function loginUser() {
+  return await request(app).put("/api/auth").send(testUser);
+}
