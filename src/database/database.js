@@ -412,7 +412,6 @@ class DB {
       user: config.db.connection.user,
       password: config.db.connection.password,
       connectTimeout: config.db.connection.connectTimeout,
-      host: config.db.connection.host,
       decimalNumbers: true,
     });
     if (setUse) {
