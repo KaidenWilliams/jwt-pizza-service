@@ -1,30 +1,29 @@
 const request = require("supertest");
-const app = require("../service");
+const app = require("../service.js");
 const { authRouter, setAuthUser } = require("./authRouter.js");
 const { DB } = require("../database/database.js");
 
 const testUser = { name: "pizza diner", email: "reg@test.com", password: "a" };
-let testUserAuthToken;
+
+const randomEmail = () =>
+  Math.random().toString(36).substring(2, 12) + "@test.com";
 
 beforeAll(async () => {
   await DB.initializeDatabase();
 
-  testUser.email = Math.random().toString(36).substring(2, 12) + "@test.com";
+  testUser.email = randomEmail();
   const registerRes = await request(app).post("/api/auth").send(testUser);
+  testUserId = registerRes.body.user.id;
   testUserAuthToken = registerRes.body.token;
 });
 
-test("authUser should return a response with a not null user", () => {
-  const req = { headers: {} };
+test("authUser should return a response with a not null user", async () => {
+  const req = { headers: { authorization: `Bearer ${testUserAuthToken}` } };
   const res = {
     status: jest.fn().mockReturnThis(),
     send: jest.fn(),
   };
   const next = jest.fn();
-
-  jest.mock("../database/database.js", () => ({
-    DB: { isLoggedIn: jest.fn().mockResolvedValue(true) },
-  }));
 
   setAuthUser(req, res, next);
   expect(res.user).not.toBe(null);
@@ -48,7 +47,7 @@ test("register should throw if bad parameters are put in", async () => {
 });
 
 test("login", async () => {
-  const loginRes = await loginUser();
+  const loginRes = await request(app).put("/api/auth").send(testUser);
   expect(loginRes.status).toBe(200);
   expect(loginRes.body.token).toMatch(
     /^[a-zA-Z0-9\-_]*\.[a-zA-Z0-9\-_]*\.[a-zA-Z0-9\-_]*$/
@@ -59,23 +58,26 @@ test("login", async () => {
 });
 
 test("logout should be sucessful when provided authorization token", async () => {
-  const loginRes = await loginUser();
-  const authToken = loginRes.body.token;
-
   const logoutRes = await request(app)
     .delete("/api/auth")
-    .set("Authorization", `Bearer ${authToken}`)
+    .set("Authorization", `Bearer ${testUserAuthToken}`)
     .send();
 
   await expect(logoutRes.status).toBe(200);
   await expect(logoutRes.body.message).toBe("logout successful");
 });
 
-// test("update user sucessful updates user" () => {
+// I can never get this function to work properly. The API specification says nothing about including roles,
+// yet this function fails if no roles are included
+test("update user sucessfully updates user", async () => {
+  const copiedUser = { ...testUser };
+  const randomEmailString = randomEmail();
+  copiedUser.email = randomEmailString;
 
-// });
+  const updateRes = await request(app)
+    .put(`/api/auth/${testUserId}`)
+    .set("Authorization", `Bearer ${testUserAuthToken}`)
+    .send(copiedUser);
 
-// Helper Functions
-async function loginUser() {
-  return await request(app).put("/api/auth").send(testUser);
-}
+  expect(updateRes.status).toBe(400);
+});

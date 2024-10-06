@@ -5,14 +5,34 @@ module.exports = async () => {
   const TEST_DB_PASSWORD = "dockerTestPassword";
   const TEST_DB_NAME = "pizza";
 
-  // Set up Docker Container
-  console.log("Setting Up Docker Container");
+  const DOCKER_CONTAINER_NAME = "test-mysql-db";
 
+  // Set up Docker Container
   const Docker = require("dockerode");
   const docker = new Docker();
+
+  // Find Containers, if for some reason container was not deleted (Because tests weren't allowed to complete), delete it
+  try {
+    const options = {
+      limit: 1,
+      filters: `{"name": ["${DOCKER_CONTAINER_NAME}"]}`,
+    };
+
+    var existingContainer = await docker.listContainers(options);
+    existingContainer = existingContainer[0];
+
+    const containerInstance = docker.getContainer(existingContainer.Id);
+    await containerInstance.inspect();
+    await containerInstance.stop();
+    await containerInstance.remove();
+  } catch (err) {}
+
+  // Create Docker Container
+  console.log("Setting Up Docker Container");
+
   const container = await docker.createContainer({
     Image: "mysql:latest",
-    name: "test-mysql-db",
+    name: DOCKER_CONTAINER_NAME,
     Env: [
       `MYSQL_ROOT_PASSWORD=${TEST_DB_PASSWORD}`,
       `MYSQL_DATABASE=${TEST_DB_NAME}`,

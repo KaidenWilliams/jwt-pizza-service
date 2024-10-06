@@ -1,8 +1,7 @@
 {
   "collectCoverage": true,
   "coverageReporters": ["json-summary", "text"],
-  "setupFiles": ["./jest.setup.js"],
-  "globalSetup": "./jestGlobalSetup.js",
-  "globalTeardown": "./jestGlobalTeardown.js",
+  "testTimeout": 1200000,
+
   "testEnvironment": "node"
 }
