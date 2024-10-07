@@ -33,7 +33,6 @@ beforeAll(async () => {
 
   testUser.email = randomEmail();
   registerRes = await request(app).post("/api/auth").send(testUser);
-  testUserId = registerRes.body.user.id;
   testUserAuthToken = registerRes.body.token;
 });
 

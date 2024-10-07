@@ -1,7 +1,6 @@
 const request = require("supertest");
 const app = require("../service.js");
 const { DB, Role } = require("../database/database.js");
-const exp = require("constants");
 
 const randomName = () => Math.random().toString(36).substring(2, 12);
 
