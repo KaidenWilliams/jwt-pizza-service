@@ -63,6 +63,21 @@ test("get user franchises should list no franchises if none are added", async ()
   await logoutUser(myTestUserToken);
 });
 
+test("get user franchises should list no franchises if user is not Admin and incorrect id given", async () => {
+  const myTestUser = await loginUser(DINER_USER);
+  const myTestUserId = myTestUser.body.user.id + "1";
+  const myTestUserToken = myTestUser.body.token;
+
+  const response = await request(app)
+    .get(`/api/franchise/${myTestUserId}`)
+    .set("Authorization", putTokenInBearer(myTestUserToken));
+
+  expect(response.status).toBe(200);
+  expect(response.body).toHaveLength(0);
+
+  await logoutUser(myTestUserToken);
+});
+
 test("post should create a new franchise if user is admin", async () => {
   //Arrange
   const myTestUser = await loginUser(ADMIN_USER);

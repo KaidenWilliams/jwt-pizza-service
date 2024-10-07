@@ -84,6 +84,46 @@ test("authUser should return null response with a null user", async () => {
   jest.restoreAllMocks();
 });
 
+test("authUser should return a response with a not null user", async () => {
+  const req = { headers: { authorization: `Bearer ${testUserAuthToken}` } };
+  const res = {
+    status: jest.fn().mockReturnThis(),
+    send: jest.fn(),
+  };
+  const next = jest.fn();
+
+  const { setAuthUser } = require("./authRouter.js");
+
+  await setAuthUser(req, res, next);
+  expect(res.user).not.toBe(null);
+});
+
+test("authUser should return not do anything if user is not logged in", async () => {
+  const req = {
+    headers: { authorization: `Bearer ${testUserAuthToken}` },
+  };
+  const res = {
+    status: jest.fn().mockReturnThis(),
+    send: jest.fn(),
+  };
+  const next = jest.fn();
+
+  const mockIsLoggedIn = jest.fn();
+
+  jest.mock("../database/database.js", () => ({
+    DB: {
+      isLoggedIn: mockIsLoggedIn,
+    },
+  }));
+
+  mockIsLoggedIn.mockResolvedValueOnce(false);
+
+  const { setAuthUser } = require("./authRouter.js");
+
+  await setAuthUser(req, res, next);
+  expect(req.user).toBe(undefined);
+});
+
 test("authToken should fail if not called with Bearer token in Authorization", () => {
   const req = { headers: {} };
   const res = {
