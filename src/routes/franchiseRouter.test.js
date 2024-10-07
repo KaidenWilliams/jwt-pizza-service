@@ -15,8 +15,9 @@ async function createUser(roleType) {
 }
 
 async function loginUser(user) {
-  const res = await request(app).put("/api/auth").send(user);
-  return res;
+  const loginRes = await request(app).put("/api/auth").send(user);
+
+  return loginRes;
 }
 
 async function logoutUser(authToken) {
@@ -48,7 +49,7 @@ test("get franchises should list no franchises if none are added", async () => {
 });
 
 test("get user franchises should list no franchises if none are added", async () => {
-  const myTestUser = await request(app).put("/api/auth").send(ADMIN_USER);
+  const myTestUser = await loginUser(ADMIN_USER);
   const myTestUserId = myTestUser.body.user.id;
   const myTestUserToken = myTestUser.body.token;
 
@@ -63,84 +64,328 @@ test("get user franchises should list no franchises if none are added", async ()
 });
 
 test("post should create a new franchise if user is admin", async () => {
-  // method: 'POST',
-  // path: '/api/franchise',
-  // requiresAuth: true,
-  // description: 'Create a new franchise',
-  // example: `curl -X POST localhost:3000/api/franchise -H 'Content-Type: application/json' -H
-  // 'Authorization: Bearer tttttt' -d '{"name": "pizzaPocket", "admins": [{"email": "f@jwt.com"}]}'`,
+  //Arrange
+  const myTestUser = await loginUser(ADMIN_USER);
+  const myTestUserEmail = myTestUser.body.user.email;
+  const myTestUserToken = myTestUser.body.token;
 
-  // const franchise = {"name": "testFranchise", "admins": [{"email": ""}] }
-  // await request(app).post("/api/franchise").set("Authorization", `Bearer ${testUserAuthToken}`).send()
+  const myFranchise = {
+    name: "testFranchise",
+    admins: [{ email: myTestUserEmail }],
+  };
 
-  const adminUser = await createAdminUser();
-  const res = await request(app).put("/api/auth").send(adminUser);
-  const loginToken = res.body.token;
-
-  await request(app)
+  //Act
+  const newFranchiseRequest = await request(app)
     .post("/api/franchise")
-    .set("Authorization", testUserAuthToken)
-    .send();
+    .set("Authorization", putTokenInBearer(myTestUserToken))
+    .send(myFranchise);
+
+  //Assert
+  expect(newFranchiseRequest.status).toBe(200);
+  expect(newFranchiseRequest.body.name).toBe(myFranchise.name);
+  expect(
+    newFranchiseRequest.body.admins.some((x) => x.email == myTestUserEmail)
+  ).toBe(true);
+
+  //Cleanup
+  await request(app)
+    .delete(`/api/franchise/${newFranchiseRequest.body.id}`)
+    .set("Authorization", putTokenInBearer(myTestUserToken));
+
+  await logoutUser(myTestUserToken);
 });
 
-// test("DELETE /api/franchise/:franchiseId should delete a franchise (admin only)", async () => {
-//   const response = await request(app)
-//     .delete(`/api/franchise/${testFranchiseId}`)
-//     .set("Authorization", `Bearer ${adminUserAuthToken}`);
-//   expect(response.status).toBe(200);
-//   expect(response.body.message).toBe("franchise deleted");
-// });
+test("post should throw if user is not admin", async () => {
+  //Arrange
+  const myTestUser = await loginUser(DINER_USER);
+  const myTestUserEmail = myTestUser.body.user.email;
+  const myTestUserToken = myTestUser.body.token;
 
-// test("DELETE /api/franchise/:franchiseId should fail for non-admin users", async () => {
-//   const response = await request(app)
-//     .delete(`/api/franchise/${testFranchiseId}`)
-//     .set("Authorization", `Bearer ${testUserAuthToken}`);
-//   expect(response.status).toBe(403);
-// });
+  const myFranchise = {
+    name: "testFranchise",
+    admins: [{ email: myTestUserEmail }],
+  };
 
-// test("POST /api/franchise/:franchiseId/store should create a new store", async () => {
-//   // First, create a new franchise for testing
-//   const franchiseData = {
-//     name: "TestFranchise",
-//     admins: [{ email: testUser.email }],
-//   };
-//   const franchiseResponse = await request(app)
-//     .post("/api/franchise")
-//     .set("Authorization", `Bearer ${adminUserAuthToken}`)
-//     .send(franchiseData);
-//   testFranchiseId = franchiseResponse.body.id;
+  //Act
+  const newFranchiseRequest = await request(app)
+    .post("/api/franchise")
+    .set("Authorization", putTokenInBearer(myTestUserToken))
+    .send(myFranchise);
 
-//   const storeData = { name: "TestStore" };
-//   const response = await request(app)
-//     .post(`/api/franchise/${testFranchiseId}/store`)
-//     .set("Authorization", `Bearer ${testUserAuthToken}`)
-//     .send(storeData);
-//   expect(response.status).toBe(200);
-//   expect(response.body).toHaveProperty("id");
-//   testStoreId = response.body.id;
-// });
+  //Assert
+  expect(newFranchiseRequest.status).toBe(403);
 
-// test("DELETE /api/franchise/:franchiseId/store/:storeId should delete a store", async () => {
-//   const response = await request(app)
-//     .delete(`/api/franchise/${testFranchiseId}/store/${testStoreId}`)
-//     .set("Authorization", `Bearer ${testUserAuthToken}`);
-//   expect(response.status).toBe(200);
-//   expect(response.body.message).toBe("store deleted");
-// });
+  // Cleanup
+  await logoutUser(myTestUserToken);
+});
 
-// test("DELETE /api/franchise/:franchiseId/store/:storeId should fail for non-franchise admins", async () => {
-//   const nonAdminUser = {
-//     name: "non-admin",
-//     email: randomEmail(),
-//     password: "pass",
-//   };
-//   const nonAdminRegisterRes = await request(app)
-//     .post("/api/auth")
-//     .send(nonAdminUser);
-//   const nonAdminToken = nonAdminRegisterRes.body.token;
+test("delete franchise should succesfully delete with an Admin User", async () => {
+  //Arrange
+  const myTestUser = await loginUser(ADMIN_USER);
+  const myTestUserEmail = myTestUser.body.user.email;
+  const myTestUserToken = myTestUser.body.token;
 
-//   const response = await request(app)
-//     .delete(`/api/franchise/${testFranchiseId}/store/${testStoreId}`)
-//     .set("Authorization", `Bearer ${nonAdminToken}`);
-//   expect(response.status).toBe(403);
-// });
+  const myFranchise = {
+    name: "testFranchise",
+    admins: [{ email: myTestUserEmail }],
+  };
+
+  const newFranchiseRequest = await request(app)
+    .post("/api/franchise")
+    .set("Authorization", putTokenInBearer(myTestUserToken))
+    .send(myFranchise);
+
+  //Act
+  const deleteFranchiseRequest = await request(app)
+    .delete(`/api/franchise/${newFranchiseRequest.body.id}`)
+    .set("Authorization", putTokenInBearer(myTestUserToken));
+
+  //Assert
+  expect(deleteFranchiseRequest.status).toBe(200);
+
+  //Cleanup
+  await logoutUser(myTestUserToken);
+});
+
+test("delete franchise should fail with a Non Admin User", async () => {
+  //Arrange
+  const myTestUser = await loginUser(ADMIN_USER);
+  const myTestUserEmail = myTestUser.body.user.email;
+  const myTestUserToken = myTestUser.body.token;
+
+  const myFranchise = {
+    name: "testFranchise",
+    admins: [{ email: myTestUserEmail }],
+  };
+
+  const newFranchiseRequest = await request(app)
+    .post("/api/franchise")
+    .set("Authorization", putTokenInBearer(myTestUserToken))
+    .send(myFranchise);
+
+  await logoutUser(myTestUserToken);
+
+  const myTestUserBad = await loginUser(DINER_USER);
+  const myTestUserTokenBad = myTestUserBad.body.token;
+
+  //Act
+  const deleteFranchiseRequest = await request(app)
+    .delete(`/api/franchise/${newFranchiseRequest.body.id}`)
+    .set("Authorization", putTokenInBearer(myTestUserTokenBad));
+
+  //Assert
+  expect(deleteFranchiseRequest.status).toBe(403);
+
+  //Cleanup
+  await logoutUser(myTestUserTokenBad);
+
+  const myTestUserGood = await loginUser(ADMIN_USER);
+  const myTestUserTokenGood = myTestUserGood.body.token;
+
+  await request(app)
+    .delete(`/api/franchise/${newFranchiseRequest.body.id}`)
+    .set("Authorization", putTokenInBearer(myTestUserTokenGood));
+
+  await logoutUser(myTestUserTokenGood);
+});
+
+test("create store should succesfully create", async () => {
+  //Arrange
+  const myTestUser = await loginUser(ADMIN_USER);
+  const myTestUserEmail = myTestUser.body.user.email;
+  const myTestUserToken = myTestUser.body.token;
+
+  const myFranchise = {
+    name: "testFranchise",
+    admins: [{ email: myTestUserEmail }],
+  };
+
+  const newFranchiseRequest = await request(app)
+    .post("/api/franchise")
+    .set("Authorization", putTokenInBearer(myTestUserToken))
+    .send(myFranchise);
+
+  const newStore = {
+    franchiseId: newFranchiseRequest.body.id,
+    name: "testFranchise",
+  };
+
+  //Act
+  const newStoreRequest = await request(app)
+    .post(`/api/franchise/${newFranchiseRequest.body.id}/store`)
+    .set("Authorization", putTokenInBearer(myTestUserToken))
+    .send(newStore);
+
+  //Assert
+  expect(newStoreRequest.status).toBe(200);
+  expect(newStoreRequest.body.franchiseId).toBe(newStore.franchiseId);
+  expect(newStoreRequest.body.name).toBe(newStore.name);
+
+  //Cleanup
+  await request(app)
+    .delete(`/api/franchise/${newFranchiseRequest.body.id}`)
+    .set("Authorization", putTokenInBearer(myTestUserToken));
+
+  await request(app)
+    .delete(
+      `/api/franchise/${newStoreRequest.body.franchiseId}/store/:${newStoreRequest.body.id}`
+    )
+    .set("Authorization", putTokenInBearer(myTestUserToken));
+
+  await logoutUser(myTestUserToken);
+});
+
+test("create store should not succesfully create if Non-Admin User", async () => {
+  //Arrange
+  const myTestUser = await loginUser(ADMIN_USER);
+  const myTestUserEmail = myTestUser.body.user.email;
+  const myTestUserToken = myTestUser.body.token;
+
+  const myFranchise = {
+    name: "testFranchise",
+    admins: [{ email: myTestUserEmail }],
+  };
+
+  const newFranchiseRequest = await request(app)
+    .post("/api/franchise")
+    .set("Authorization", putTokenInBearer(myTestUserToken))
+    .send(myFranchise);
+
+  const newStore = {
+    franchiseId: newFranchiseRequest.body.id,
+    name: "testFranchise",
+  };
+
+  await logoutUser(myTestUserToken);
+
+  const myTestUserBad = await loginUser(DINER_USER);
+  const myTestUserTokenBad = myTestUserBad.body.token;
+
+  //Act
+  const newStoreRequest = await request(app)
+    .post(`/api/franchise/${newFranchiseRequest.body.id}/store`)
+    .set("Authorization", putTokenInBearer(myTestUserTokenBad))
+    .send(newStore);
+
+  //Assert
+  expect(newStoreRequest.status).toBe(403);
+
+  //Cleanup
+
+  await logoutUser(myTestUserTokenBad);
+
+  const myTestUserGood = await loginUser(ADMIN_USER);
+  const myTestUserTokenGood = myTestUserGood.body.token;
+
+  await request(app)
+    .delete(`/api/franchise/${newFranchiseRequest.body.id}`)
+    .set("Authorization", putTokenInBearer(myTestUserTokenGood));
+
+  await logoutUser(myTestUserTokenGood);
+});
+
+test("delete store should succesfully delete", async () => {
+  //Arrange
+  const myTestUser = await loginUser(ADMIN_USER);
+  const myTestUserEmail = myTestUser.body.user.email;
+  const myTestUserToken = myTestUser.body.token;
+
+  const myFranchise = {
+    name: "testFranchise",
+    admins: [{ email: myTestUserEmail }],
+  };
+
+  const newFranchiseRequest = await request(app)
+    .post("/api/franchise")
+    .set("Authorization", putTokenInBearer(myTestUserToken))
+    .send(myFranchise);
+
+  const newStore = {
+    franchiseId: newFranchiseRequest.body.id,
+    name: "testFranchise",
+  };
+
+  const newStoreRequest = await request(app)
+    .post(`/api/franchise/${newFranchiseRequest.body.id}/store`)
+    .set("Authorization", putTokenInBearer(myTestUserToken))
+    .send(newStore);
+
+  //Act
+  const storeDeleteRequest = await request(app)
+    .delete(`/api/franchise/${newFranchiseRequest.body.id}`)
+    .set("Authorization", putTokenInBearer(myTestUserToken));
+
+  //Assert
+  expect(storeDeleteRequest.status).toBe(200);
+
+  //Cleanup
+  await request(app)
+    .delete(
+      `/api/franchise/${newStoreRequest.body.franchiseId}/store/:${newStoreRequest.body.id}`
+    )
+    .set("Authorization", putTokenInBearer(myTestUserToken));
+
+  await logoutUser(myTestUserToken);
+});
+
+test("delete store should not succesfully delete if Non-Admin User", async () => {
+  //Arrange
+  const myTestUser = await loginUser(ADMIN_USER);
+  const myTestUserEmail = myTestUser.body.user.email;
+  const myTestUserToken = myTestUser.body.token;
+
+  const myFranchise = {
+    name: "testFranchise",
+    admins: [{ email: myTestUserEmail }],
+  };
+
+  const newFranchiseRequest = await request(app)
+    .post("/api/franchise")
+    .set("Authorization", putTokenInBearer(myTestUserToken))
+    .send(myFranchise);
+
+  const newStore = {
+    franchiseId: newFranchiseRequest.body.id,
+    name: "testFranchise",
+  };
+
+  const newStoreRequest = await request(app)
+    .post(`/api/franchise/${newFranchiseRequest.body.id}/store`)
+    .set("Authorization", putTokenInBearer(myTestUserToken))
+    .send(newStore);
+
+  await logoutUser(myTestUserToken);
+
+  const myTestUserBad = await loginUser(DINER_USER);
+  const myTestUserTokenBad = myTestUserBad.body.token;
+
+  //Act
+  const storeDeleteRequest = await request(app)
+    .delete(
+      `/api/franchise/${newStoreRequest.body.franchiseId}/store/:${newStoreRequest.body.id}`
+    )
+    .set("Authorization", putTokenInBearer(myTestUserTokenBad));
+
+  //Assert
+  expect(storeDeleteRequest.status).toBe(403);
+  expect(storeDeleteRequest.body.message).toBe("unable to delete a store");
+
+  //Cleanup
+
+  await logoutUser(myTestUserTokenBad);
+
+  const myTestUserGood = await loginUser(ADMIN_USER);
+  const myTestUserTokenGood = myTestUserGood.body.token;
+
+  await request(app)
+    .delete(`/api/franchise/${newFranchiseRequest.body.id}`)
+    .set("Authorization", putTokenInBearer(myTestUserTokenGood));
+
+  await request(app)
+    .delete(
+      `/api/franchise/${newStoreRequest.body.franchiseId}/store/:${newStoreRequest.body.id}`
+    )
+    .set("Authorization", putTokenInBearer(myTestUserTokenGood));
+
+  await logoutUser(myTestUserTokenGood);
+});
