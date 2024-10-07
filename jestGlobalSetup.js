@@ -25,7 +25,9 @@ module.exports = async () => {
     await containerInstance.inspect();
     await containerInstance.stop();
     await containerInstance.remove();
-  } catch (err) {}
+  } catch {
+    console.log("Docker Container did not exist as expected");
+  }
 
   // Create Docker Container
   console.log("Setting Up Docker Container");
@@ -68,7 +70,7 @@ module.exports = async () => {
         });
         await connection.end();
         return;
-      } catch (err) {
+      } catch {
         // Wait 1 second
         await delay(1000);
       }

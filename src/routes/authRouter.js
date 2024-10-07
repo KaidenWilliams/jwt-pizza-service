@@ -141,7 +141,7 @@ authRouter.put(
       if (user.id !== userId && !user.isRole(Role.Admin)) {
         return res.status(403).json({ message: "unauthorized" });
       }
-    } catch (err) {
+    } catch {
       return res
         .status(400)
         .json({ message: "request must include user id and roles" });
