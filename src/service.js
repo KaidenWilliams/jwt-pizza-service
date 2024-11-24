@@ -25,7 +25,21 @@ app.use((req, res, next) => {
 
 const apiRouter = express.Router();
 app.use("/api", apiRouter);
-apiRouter.use("/auth", authRouter);
+// Augment original Auth router middleware with metric middlware
+apiRouter.use(
+  "/auth",
+  (req, res, next) => {
+    // Captures original res.end to be called with corresponding args AFTER we log the Auth Request
+    const originalEnd = res.end;
+    res.end = function (...args) {
+      metrics.logAuthRequest(res);
+      originalEnd.apply(res, args);
+    };
+
+    next();
+  },
+  authRouter
+);
 apiRouter.use("/order", orderRouter);
 apiRouter.use("/franchise", franchiseRouter);
 

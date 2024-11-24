@@ -24,32 +24,57 @@ class Metrics {
       return Metrics.instance;
     }
 
-    this.requests = {
-      all: 0,
-      get: 0,
-      post: 0,
-      put: 0,
-      delete: 0,
-    };
-
     Metrics.instance = this;
     this.startMetricsTimer();
   }
 
   startMetricsTimer() {
     const timer = setInterval(async () => {
-      await this.sendAllMetrics();
+      await this.sendAll();
     }, 10000);
     timer.unref();
   }
 
-  async sendAllMetrics() {
-    await this.sendHTTPMetrics();
-    await this.sendCPUMetrics();
-    await this.sendMemoryMetrics();
+  async sendAll() {
+    const builder = new MetricBuilder();
+    this.makeHTTPMetrics(builder);
+    this.makeAuthMetrics(builder);
+    // Couldn't get CPU stuff to work synchronously
+    await this.makeCPUMetrics(builder);
+    this.makeMemoryMetrics(builder);
+    await this.sendMetricsToGrafana(builder.metrics);
+  }
+
+  // Shared send Function
+  async sendMetricsToGrafana(metricList) {
+    for (const metric of metricList) {
+      await fetch(`${config.metrics.url}`, {
+        method: "post",
+        body: metric,
+        headers: { Authorization: `Bearer ${config.metrics.userId}:${config.metrics.apiKey}` },
+      })
+        .then((response) => {
+          if (!response.ok) {
+            console.error("Failed to push metrics data to Grafana");
+          } else {
+            console.log(`Pushed ${metric}`);
+          }
+        })
+        .catch((error) => {
+          console.error("Error pushing metrics:", error);
+        });
+    }
   }
 
   // a. HTTP Requests
+  requests = {
+    all: 0,
+    get: 0,
+    post: 0,
+    put: 0,
+    delete: 0,
+  };
+
   logHTTPRequest(req) {
     const method = req.method.toLowerCase();
 
@@ -59,14 +84,38 @@ class Metrics {
     }
   }
 
-  async sendHTTPMetrics() {
+  makeHTTPMetrics(builder) {
     for (const method in this.requests) {
-      await this.sendMetricToGrafana("request", method, "total", this.requests[method]);
+      builder.addMetric("request", method, "total", this.requests[method]);
       this.requests[method] = 0;
     }
   }
 
-  // b. CPU and Memory
+  // b. Auth successes / failures
+  authRequests = {
+    success: 0,
+    failure: 0,
+  };
+
+  logAuthRequest(res) {
+    if (res.statusCode === 200) {
+      this.authRequests["success"]++;
+    } else if (res.statusCode >= 400) {
+      this.authRequests["failure"]++;
+    }
+  }
+
+  makeAuthMetrics(builder) {
+    for (const status in this.authRequests) {
+      builder.addMetric("auth", status, "total", this.authRequests[status]);
+      this.authRequests[status] = 0;
+    }
+  }
+
+  // c. Active users
+  // ...
+
+  // d. CPU and Memory
   async getCpuUsagePercentage() {
     const value = await new Promise((resolve) => {
       osUtils.cpuUsage((value) => {
@@ -76,9 +125,9 @@ class Metrics {
     return (value * 100).toFixed(1);
   }
 
-  async sendCPUMetrics() {
+  async makeCPUMetrics(builder) {
     const cpuUsage = await this.getCpuUsagePercentage();
-    await this.sendMetricToGrafana("system", "cpu", "usage", cpuUsage);
+    builder.addMetric("system", "cpu", "usage", cpuUsage);
   }
 
   getMemoryUsagePercentage() {
@@ -89,32 +138,21 @@ class Metrics {
     return memoryUsage.toFixed(2);
   }
 
-  async sendMemoryMetrics() {
+  makeMemoryMetrics(builder) {
     const memoryUsage = this.getMemoryUsagePercentage();
-    await this.sendMetricToGrafana("system", "memory", "usage", memoryUsage);
+    builder.addMetric("system", "memory", "usage", memoryUsage);
   }
 
-  // c. Authentication Attempts
+  // e. Latency (service endpoint, pizza creation)
 
-  // Shared send Function
-  async sendMetricToGrafana(metricPrefix, type, metricName, metricValue) {
+  // f. Pizzas (Sold/minute, Creation failures, Revenue/minute)
+}
+
+class MetricBuilder {
+  metrics = [];
+  addMetric(metricPrefix, type, metricName, metricValue) {
     const metric = `${metricPrefix},source=${config.metrics.source},type=${type} ${metricName}=${metricValue}`;
-
-    await fetch(`${config.metrics.url}`, {
-      method: "post",
-      body: metric,
-      headers: { Authorization: `Bearer ${config.metrics.userId}:${config.metrics.apiKey}` },
-    })
-      .then((response) => {
-        if (!response.ok) {
-          console.error("Failed to push metrics data to Grafana");
-        } else {
-          console.log(`Pushed ${metric}`);
-        }
-      })
-      .catch((error) => {
-        console.error("Error pushing metrics:", error);
-      });
+    this.metrics.push(metric);
   }
 }
 
