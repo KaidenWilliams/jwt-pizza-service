@@ -13,6 +13,8 @@
 // d. Latency i. Service Endpoint. ii. Pizza Creation
 
 const config = require("./config.js");
+const os = require("os");
+const osUtils = require("os-utils");
 
 class Metrics {
   static instance = null;
@@ -34,7 +36,21 @@ class Metrics {
     this.startMetricsTimer();
   }
 
-  requestTracker(req) {
+  startMetricsTimer() {
+    const timer = setInterval(async () => {
+      await this.sendAllMetrics();
+    }, 10000);
+    timer.unref();
+  }
+
+  async sendAllMetrics() {
+    await this.sendHTTPMetrics();
+    await this.sendCPUMetrics();
+    await this.sendMemoryMetrics();
+  }
+
+  // a. HTTP Requests
+  logHTTPRequest(req) {
     const method = req.method.toLowerCase();
 
     this.requests.all++;
@@ -43,22 +59,46 @@ class Metrics {
     }
   }
 
-  startMetricsTimer() {
-    const timer = setInterval(async () => {
-      await this.sendEveryRequest();
-    }, 10000);
-    timer.unref();
-  }
-
-  async sendEveryRequest() {
+  async sendHTTPMetrics() {
     for (const method in this.requests) {
       await this.sendMetricToGrafana("request", method, "total", this.requests[method]);
       this.requests[method] = 0;
     }
   }
 
-  async sendMetricToGrafana(metricPrefix, httpMethod, metricName, metricValue) {
-    const metric = `${metricPrefix},source=${config.metrics.source},method=${httpMethod} ${metricName}=${metricValue}`;
+  // b. CPU and Memory
+  async getCpuUsagePercentage() {
+    const value = await new Promise((resolve) => {
+      osUtils.cpuUsage((value) => {
+        resolve(value);
+      });
+    });
+    return (value * 100).toFixed(1);
+  }
+
+  async sendCPUMetrics() {
+    const cpuUsage = await this.getCpuUsagePercentage();
+    await this.sendMetricToGrafana("system", "cpu", "usage", cpuUsage);
+  }
+
+  getMemoryUsagePercentage() {
+    const totalMemory = os.totalmem();
+    const freeMemory = os.freemem();
+    const usedMemory = totalMemory - freeMemory;
+    const memoryUsage = (usedMemory / totalMemory) * 100;
+    return memoryUsage.toFixed(2);
+  }
+
+  async sendMemoryMetrics() {
+    const memoryUsage = this.getMemoryUsagePercentage();
+    await this.sendMetricToGrafana("system", "memory", "usage", memoryUsage);
+  }
+
+  // c. Authentication Attempts
+
+  // Shared send Function
+  async sendMetricToGrafana(metricPrefix, type, metricName, metricValue) {
+    const metric = `${metricPrefix},source=${config.metrics.source},type=${type} ${metricName}=${metricValue}`;
 
     await fetch(`${config.metrics.url}`, {
       method: "post",

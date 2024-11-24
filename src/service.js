@@ -19,7 +19,7 @@ app.use((req, res, next) => {
 
 // Logging Middleware
 app.use((req, res, next) => {
-  metrics.requestTracker(req);
+  metrics.logHTTPRequest(req);
   next();
 });
 
