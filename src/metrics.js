@@ -31,18 +31,21 @@ class Metrics {
   startMetricsTimer() {
     const timer = setInterval(async () => {
       await this.sendAll();
-    }, 10000);
+    }, 15000);
     timer.unref();
   }
 
   async sendAll() {
     const builder = new MetricBuilder();
-    this.makeHTTPMetrics(builder);
-    this.makeAuthMetrics(builder);
+    // this.makeHTTPMetrics(builder);
+    // this.makeAuthMetrics(builder);
+    this.makeActiveUserMetrics(builder);
     // Couldn't get CPU stuff to work synchronously
-    await this.makeCPUMetrics(builder);
-    this.makeMemoryMetrics(builder);
+    // await this.makeCPUMetrics(builder);
+    // this.makeMemoryMetrics(builder);
     await this.sendMetricsToGrafana(builder.metrics);
+    console.log();
+    console.log();
   }
 
   // Shared send Function
@@ -55,7 +58,9 @@ class Metrics {
       })
         .then((response) => {
           if (!response.ok) {
-            console.error("Failed to push metrics data to Grafana");
+            console.log(
+              `Failed to push metrics data to Grafana. Status: ${response.status} - ${response.statusText}`
+            );
           } else {
             console.log(`Pushed ${metric}`);
           }
@@ -91,7 +96,7 @@ class Metrics {
     }
   }
 
-  // b. Auth successes / failures
+  // b. Auth successes / failures and C. Current active users
   authRequests = {
     success: 0,
     failure: 0,
@@ -113,7 +118,32 @@ class Metrics {
   }
 
   // c. Active users
-  // ...
+  activeUserCount = 0;
+
+  // horrible way to do it, couldn't think of better one though
+  logActiveUsers(req, res) {
+    if (res.statusCode !== 200) return;
+
+    if (this.isRegisterRequest(req) || this.isLoginRequest(req)) {
+      this.activeUserCount++;
+    } else if (this.isLogoutRequest(req)) {
+      this.activeUserCount--;
+    }
+  }
+
+  isRegisterRequest(req) {
+    return req.method.toLowerCase() === "post" && req.path === "/";
+  }
+  isLoginRequest(req) {
+    return req.method.toLowerCase() === "put" && req.path === "/";
+  }
+  isLogoutRequest(req) {
+    return req.method.toLowerCase() === "delete" && req.path === "/";
+  }
+
+  makeActiveUserMetrics(builder) {
+    builder.addMetric("user", "active", "total", this.activeUserCount);
+  }
 
   // d. CPU and Memory
   async getCpuUsagePercentage() {
