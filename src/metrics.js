@@ -12,10 +12,16 @@
 
 // d. Latency i. Service Endpoint. ii. Pizza Creation
 
-const config = require("./config.json");
+const config = require("./config.js");
 
 class Metrics {
+  static instance = null;
+
   constructor() {
+    if (Metrics.instance) {
+      return Metrics.instance;
+    }
+
     this.requests = {
       all: 0,
       get: 0,
@@ -24,6 +30,7 @@ class Metrics {
       delete: 0,
     };
 
+    Metrics.instance = this;
     this.startMetricsTimer();
   }
 
@@ -31,31 +38,32 @@ class Metrics {
     const method = req.method.toLowerCase();
 
     this.requests.all++;
-    if (this.requests[method !== undefined]) {
+    if (method in this.requests) {
       this.requests[method]++;
     }
   }
 
   startMetricsTimer() {
-    const timer = setInterval(() => {
-      this.sendEveryRequest();
+    const timer = setInterval(async () => {
+      await this.sendEveryRequest();
     }, 10000);
     timer.unref();
   }
 
-  sendEveryRequest() {
+  async sendEveryRequest() {
     for (const method in this.requests) {
-      this.sendMetricToGrafana("request", method, "total", this.requests[method]);
+      await this.sendMetricToGrafana("request", method, "total", this.requests[method]);
+      this.requests[method] = 0;
     }
   }
 
-  sendMetricToGrafana(metricPrefix, httpMethod, metricName, metricValue) {
-    const metric = `${metricPrefix},source=${config.source},method=${httpMethod} ${metricName}=${metricValue}`;
+  async sendMetricToGrafana(metricPrefix, httpMethod, metricName, metricValue) {
+    const metric = `${metricPrefix},source=${config.metrics.source},method=${httpMethod} ${metricName}=${metricValue}`;
 
-    fetch(`${config.url}`, {
+    await fetch(`${config.metrics.url}`, {
       method: "post",
       body: metric,
-      headers: { Authorization: `Bearer ${config.userId}:${config.apiKey}` },
+      headers: { Authorization: `Bearer ${config.metrics.userId}:${config.metrics.apiKey}` },
     })
       .then((response) => {
         if (!response.ok) {
