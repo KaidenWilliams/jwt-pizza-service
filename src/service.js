@@ -10,6 +10,20 @@ const app = express();
 app.use(express.json());
 app.use(setAuthUser);
 
+// Latency Middleware
+app.use((req, res, next) => {
+  const start = process.hrtime();
+
+  res.on("finish", () => {
+    const [seconds, nanoseconds] = process.hrtime(start);
+    const duration = seconds * 1000 + nanoseconds / 1e6;
+
+    metrics.recordLatency(req, res, duration);
+  });
+
+  next();
+});
+
 app.use((req, res, next) => {
   res.setHeader("Access-Control-Allow-Origin", req.headers.origin || "*");
   res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE");
@@ -42,6 +56,7 @@ apiRouter.use(
   },
   authRouter
 );
+
 apiRouter.use("/order", orderRouter);
 apiRouter.use("/franchise", franchiseRouter);
 

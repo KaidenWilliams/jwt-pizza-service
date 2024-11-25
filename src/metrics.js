@@ -17,6 +17,8 @@ const os = require("os");
 const osUtils = require("os-utils");
 
 class Metrics {
+  INTERVAL = 10000;
+
   static instance = null;
 
   constructor() {
@@ -31,20 +33,21 @@ class Metrics {
   startMetricsTimer() {
     const timer = setInterval(async () => {
       await this.sendAll();
-    }, 15000);
+    }, this.INTERVAL);
     timer.unref();
   }
 
   async sendAll() {
     const builder = new MetricBuilder();
-    // this.makeHTTPMetrics(builder);
-    // this.makeAuthMetrics(builder);
+    this.makeHTTPMetrics(builder);
+    this.makeAuthMetrics(builder);
     this.makeActiveUserMetrics(builder);
     // Couldn't get CPU stuff to work synchronously
-    // await this.makeCPUMetrics(builder);
-    // this.makeMemoryMetrics(builder);
+    await this.makeCPUMetrics(builder);
+    this.makeMemoryMetrics(builder);
+    this.makeLatencyMetrics(builder);
+    this.makePizzaMetrics(builder);
     await this.sendMetricsToGrafana(builder.metrics);
-    console.log();
     console.log();
   }
 
@@ -175,7 +178,79 @@ class Metrics {
 
   // e. Latency (service endpoint, pizza creation)
 
+  latencyArr = [];
+  pizzaCreationLatencyArr = [];
+
+  recordLatency(req, res, duration) {
+    this.latencyArr.push(duration);
+
+    if (this.isCreatePizzaRequest(req)) {
+      this.pizzaCreationLatencyArr.push(duration);
+
+      this.calculatePizzaMetrics(res);
+    }
+  }
+
+  isCreatePizzaRequest(req) {
+    return req.method.toLowerCase() === "post" && req.originalUrl === "/api/order";
+  }
+
+  makeLatencyMetrics(builder) {
+    if (this.latencyArr.length > 0) {
+      const allAverageLatency = (
+        this.latencyArr.reduce((sum, value) => sum + value, 0) / this.latencyArr.length
+      ).toFixed(1);
+
+      builder.addMetric("latency", "all", "average", allAverageLatency);
+
+      this.latencyArr = [];
+    }
+
+    if (this.pizzaCreationLatencyArr.length > 0) {
+      const pizzaAverageLatency = (
+        this.pizzaCreationLatencyArr.reduce((sum, value) => sum + value, 0) /
+        this.pizzaCreationLatencyArr.length
+      ).toFixed(1);
+
+      builder.addMetric("latency", "pizza", "average", pizzaAverageLatency);
+
+      this.pizzaCreationLatencyArr = [];
+    }
+  }
+
   // f. Pizzas (Sold/minute, Creation failures, Revenue/minute)
+
+  pizzaMetrics = {
+    sold: 0,
+    failed: 0,
+    revenue: 0,
+  };
+
+  calculatePizzaMetrics(res) {
+    if (res.statusCode === 200) {
+      // Successful order
+      this.pizzaMetrics.sold++;
+      this.pizzaMetrics.revenue += calculateOrderTotal(res.order);
+    } else {
+      // Failed order
+      this.pizzaMetrics.failed++;
+    }
+  }
+
+  calculateOrderTotal(order) {
+    return order.items.reduce((total, item) => total + item.price, 0);
+  }
+
+  makePizzaMetrics(builder) {
+    builder.addMetric("pizza", "success", "transactions", this.pizzaMetrics.sold);
+    this.pizzaMetrics.sold = 0;
+
+    builder.addMetric("pizza", "failure", "transactions", this.pizzaMetrics.failed);
+    this.pizzaMetrics.failed = 0;
+
+    builder.addMetric("pizza", "total", "money", this.pizzaMetrics.revenue);
+    this.pizzaMetrics.revenue = 0;
+  }
 }
 
 class MetricBuilder {
