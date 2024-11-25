@@ -230,7 +230,7 @@ class Metrics {
     if (res.statusCode === 200) {
       // Successful order
       this.pizzaMetrics.sold++;
-      this.pizzaMetrics.revenue += calculateOrderTotal(res.order);
+      this.pizzaMetrics.revenue += this.calculateOrderTotal(res.order);
     } else {
       // Failed order
       this.pizzaMetrics.failed++;
