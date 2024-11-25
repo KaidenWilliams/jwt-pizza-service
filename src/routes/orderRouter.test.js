@@ -21,10 +21,7 @@ async function loginUser(user) {
 }
 
 async function logoutUser(authToken) {
-  const res = await request(app)
-    .delete("/api/auth")
-    .set("Authorization", `Bearer ${authToken}`)
-    .send();
+  const res = await request(app).delete("/api/auth").set("Authorization", `Bearer ${authToken}`).send();
   return res;
 }
 

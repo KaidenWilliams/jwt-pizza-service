@@ -58,7 +58,7 @@ module.exports = async () => {
   console.log("Waiting for MySQL to be ready");
   const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-  const makeSureMySQLIsReady = async (maxAttempts = 15) => {
+  const makeSureMySQLIsReady = async (maxAttempts = 30) => {
     const mysql = require("mysql2/promise");
     for (let attempt = 0; attempt < maxAttempts; attempt++) {
       try {

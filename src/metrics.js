@@ -238,6 +238,7 @@ class Metrics {
   }
 
   calculateOrderTotal(order) {
+    if (!order || !order.items) return 0;
     return order.items.reduce((total, item) => total + item.price, 0);
   }
 
