@@ -74,12 +74,14 @@ jobs:
 
       - name: Write jest setup file
         run: |
-          echo "module.exports = {
+          cat <<EOF > jest.config.js
+          module.exports = {
             collectCoverage: true,
             coverageReporters: ["json-summary", "text"],
             testTimeout: 1200000,
-            testEnvironment: "node",
-          };" > jest.config.js
+            testEnvironment: "node"
+          };
+          EOF
 
       - name: Tests
         run: npm test
