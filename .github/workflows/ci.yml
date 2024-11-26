@@ -59,13 +59,13 @@ jobs:
               apiKey: '${{ secrets.FACTORY_API_KEY }}',
             },
             metrics: {
-              source: 'jwt_pizza_deliverable-prd',
+              source: 'jwt-pizza-deliverable-prd',
               userId: '${{ secrets.METRICS_USER_ID }}',
               url: '${{ secrets.METRICS_URL }}',
               apiKey: '${{ secrets.METRICS_API_KEY }}',
             },
             logging: {
-              source: 'jwt_pizza_deliverable-prd',
+              source: 'jwt-pizza-deliverable-prd',
               userId: '${{ secrets.LOGGING_USER_ID }}',
               url: '${{ secrets.LOGGING_URL }}',
               apiKey: '${{ secrets.LOGGING_API_KEY }}',
