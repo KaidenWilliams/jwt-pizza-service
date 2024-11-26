@@ -72,6 +72,15 @@ jobs:
             },
           };" > src/config.js
 
+      - name: Write jest setup file
+        run: |
+          echo "module.exports = {
+            collectCoverage: true,
+            coverageReporters: ["json-summary", "text"],
+            testTimeout: 1200000,
+            testEnvironment: "node",
+          };" > jest.config.js
+
       - name: Tests
         run: npm test
 
