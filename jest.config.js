@@ -6,7 +6,7 @@ module.exports = {
 
   // Local Testing stuff to Use Docker Container, probably should put in CI script but I am lazy
 
-  // setupFiles: ["./jest.setup.js"],
-  // globalSetup: "./jestGlobalSetup.js",
-  // globalTeardown: "./jestGlobalTeardown.js",
+  setupFiles: ["./jest.setup.js"],
+  globalSetup: "./jestGlobalSetup.js",
+  globalTeardown: "./jestGlobalTeardown.js",
 };

@@ -1,6 +1,15 @@
-const config = require("./config.json");
+const config = require("./config.js");
 
 class Logger {
+  static instance = null;
+
+  constructor() {
+    if (Logger.instance) {
+      return Logger.instance;
+    }
+    Logger.instance = this;
+  }
+
   httpLogger = (req, res, next) => {
     let send = res.send;
     res.send = (resBody) => {
@@ -21,7 +30,7 @@ class Logger {
   };
 
   log(level, type, logData) {
-    const labels = { component: config.source, level: level, type: type };
+    const labels = { component: config.logging.source, level: level, type: type };
     const values = [this.nowString(), this.sanitize(logData)];
     const logEvent = { streams: [{ stream: labels, values: [values] }] };
 
@@ -38,6 +47,7 @@ class Logger {
     return (Math.floor(Date.now()) * 1000000).toString();
   }
 
+  // I'm skeptical of this sanatize function but I'm sure there is a lesson to be learned from this somewhere down the road
   sanitize(logData) {
     logData = JSON.stringify(logData);
     return logData.replace(/\\"password\\":\s*\\"[^"]*\\"/g, '\\"password\\": \\"*****\\"');
@@ -45,16 +55,18 @@ class Logger {
 
   sendLogToGrafana(event) {
     const body = JSON.stringify(event);
-    fetch(`${config.url}`, {
+    fetch(`${config.logging.url}`, {
       method: "post",
       body: body,
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${config.userId}:${config.apiKey}`,
+        Authorization: `Bearer ${config.logging.userId}:${config.logging.apiKey}`,
       },
     }).then((res) => {
       if (!res.ok) console.log("Failed to send log to Grafana");
     });
   }
 }
-module.exports = new Logger();
+
+const logger = new Logger();
+module.exports = logger;

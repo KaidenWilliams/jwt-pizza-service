@@ -4,6 +4,8 @@ const config = require("../config.js");
 const { StatusCodeError } = require("../endpointHelper.js");
 const { Role } = require("../model/model.js");
 const dbModel = require("./dbModel.js");
+const logger = require("../logger.js");
+
 class DB {
   constructor() {
     this.initialized = this.initializeDatabase();
@@ -47,25 +49,20 @@ class DB {
       for (const role of user.roles) {
         switch (role.role) {
           case Role.Franchisee: {
-            const franchiseId = await this.getID(
-              connection,
-              "name",
-              role.object,
-              "franchise"
-            );
-            await this.query(
-              connection,
-              `INSERT INTO userRole (userId, role, objectId) VALUES (?, ?, ?)`,
-              [userId, role.role, franchiseId]
-            );
+            const franchiseId = await this.getID(connection, "name", role.object, "franchise");
+            await this.query(connection, `INSERT INTO userRole (userId, role, objectId) VALUES (?, ?, ?)`, [
+              userId,
+              role.role,
+              franchiseId,
+            ]);
             break;
           }
           default: {
-            await this.query(
-              connection,
-              `INSERT INTO userRole (userId, role, objectId) VALUES (?, ?, ?)`,
-              [userId, role.role, 0]
-            );
+            await this.query(connection, `INSERT INTO userRole (userId, role, objectId) VALUES (?, ?, ?)`, [
+              userId,
+              role.role,
+              0,
+            ]);
             break;
           }
         }
@@ -79,21 +76,13 @@ class DB {
   async getUser(email, password) {
     const connection = await this.getConnection();
     try {
-      const userResult = await this.query(
-        connection,
-        `SELECT * FROM user WHERE email=?`,
-        [email]
-      );
+      const userResult = await this.query(connection, `SELECT * FROM user WHERE email=?`, [email]);
       const user = userResult[0];
       if (!user || !(await bcrypt.compare(password, user.password))) {
         throw new StatusCodeError("unknown user", 404);
       }
 
-      const roleResult = await this.query(
-        connection,
-        `SELECT * FROM userRole WHERE userId=?`,
-        [user.id]
-      );
+      const roleResult = await this.query(connection, `SELECT * FROM userRole WHERE userId=?`, [user.id]);
       const roles = roleResult.map((r) => {
         return { objectId: r.objectId || undefined, role: r.role };
       });
@@ -129,11 +118,7 @@ class DB {
     token = this.getTokenSignature(token);
     const connection = await this.getConnection();
     try {
-      await this.query(
-        connection,
-        `INSERT INTO auth (token, userId) VALUES (?, ?)`,
-        [token, userId]
-      );
+      await this.query(connection, `INSERT INTO auth (token, userId) VALUES (?, ?)`, [token, userId]);
     } finally {
       connection.end();
     }
@@ -143,11 +128,7 @@ class DB {
     token = this.getTokenSignature(token);
     const connection = await this.getConnection();
     try {
-      const authResult = await this.query(
-        connection,
-        `SELECT userId FROM auth WHERE token=?`,
-        [token]
-      );
+      const authResult = await this.query(connection, `SELECT userId FROM auth WHERE token=?`, [token]);
       return authResult.length > 0;
     } finally {
       connection.end();
@@ -214,34 +195,27 @@ class DB {
     const connection = await this.getConnection();
     try {
       for (const admin of franchise.admins) {
-        const adminUser = await this.query(
-          connection,
-          `SELECT id, name FROM user WHERE email=?`,
-          [admin.email]
-        );
+        const adminUser = await this.query(connection, `SELECT id, name FROM user WHERE email=?`, [
+          admin.email,
+        ]);
         if (adminUser.length == 0) {
-          throw new StatusCodeError(
-            `unknown user for franchise admin ${admin.email} provided`,
-            404
-          );
+          throw new StatusCodeError(`unknown user for franchise admin ${admin.email} provided`, 404);
         }
         admin.id = adminUser[0].id;
         admin.name = adminUser[0].name;
       }
 
-      const franchiseResult = await this.query(
-        connection,
-        `INSERT INTO franchise (name) VALUES (?)`,
-        [franchise.name]
-      );
+      const franchiseResult = await this.query(connection, `INSERT INTO franchise (name) VALUES (?)`, [
+        franchise.name,
+      ]);
       franchise.id = franchiseResult.insertId;
 
       for (const admin of franchise.admins) {
-        await this.query(
-          connection,
-          `INSERT INTO userRole (userId, role, objectId) VALUES (?, ?, ?)`,
-          [admin.id, Role.Franchisee, franchise.id]
-        );
+        await this.query(connection, `INSERT INTO userRole (userId, role, objectId) VALUES (?, ?, ?)`, [
+          admin.id,
+          Role.Franchisee,
+          franchise.id,
+        ]);
       }
 
       return franchise;
@@ -255,15 +229,9 @@ class DB {
     try {
       await connection.beginTransaction();
       try {
-        await this.query(connection, `DELETE FROM store WHERE franchiseId=?`, [
-          franchiseId,
-        ]);
-        await this.query(connection, `DELETE FROM userRole WHERE objectId=?`, [
-          franchiseId,
-        ]);
-        await this.query(connection, `DELETE FROM franchise WHERE id=?`, [
-          franchiseId,
-        ]);
+        await this.query(connection, `DELETE FROM store WHERE franchiseId=?`, [franchiseId]);
+        await this.query(connection, `DELETE FROM userRole WHERE objectId=?`, [franchiseId]);
+        await this.query(connection, `DELETE FROM franchise WHERE id=?`, [franchiseId]);
         await connection.commit();
       } catch {
         await connection.rollback();
@@ -277,19 +245,14 @@ class DB {
   async getFranchises(authUser) {
     const connection = await this.getConnection();
     try {
-      const franchises = await this.query(
-        connection,
-        `SELECT id, name FROM franchise`
-      );
+      const franchises = await this.query(connection, `SELECT id, name FROM franchise`);
       for (const franchise of franchises) {
         if (authUser?.isRole(Role.Admin)) {
           await this.getFranchise(franchise);
         } else {
-          franchise.stores = await this.query(
-            connection,
-            `SELECT id, name FROM store WHERE franchiseId=?`,
-            [franchise.id]
-          );
+          franchise.stores = await this.query(connection, `SELECT id, name FROM store WHERE franchiseId=?`, [
+            franchise.id,
+          ]);
         }
       }
       return franchises;
@@ -362,11 +325,7 @@ class DB {
   async deleteStore(franchiseId, storeId) {
     const connection = await this.getConnection();
     try {
-      await this.query(
-        connection,
-        `DELETE FROM store WHERE franchiseId=? AND id=?`,
-        [franchiseId, storeId]
-      );
+      await this.query(connection, `DELETE FROM store WHERE franchiseId=? AND id=?`, [franchiseId, storeId]);
     } finally {
       connection.end();
     }
@@ -384,16 +343,28 @@ class DB {
     return "";
   }
 
+  // ADDED CENTRALIZED LOGGING
   async query(connection, sql, params) {
-    const [results] = await connection.execute(sql, params);
-    return results;
+    try {
+      logger.log("info", "database", {
+        action: "query",
+        sql: sql.split(" ")[0],
+        table: sql.split(" ")[2] || "unknown",
+      });
+
+      const [results] = await connection.execute(sql, params);
+      return results;
+    } catch (error) {
+      logger.log("error", "database", {
+        action: "query_error",
+        error: error.message,
+      });
+      throw error;
+    }
   }
 
   async getID(connection, key, value, table) {
-    const [rows] = await connection.execute(
-      `SELECT id FROM ${table} WHERE ${key}=?`,
-      [value]
-    );
+    const [rows] = await connection.execute(`SELECT id FROM ${table} WHERE ${key}=?`, [value]);
     if (rows.length > 0) {
       return rows[0].id;
     }
@@ -422,19 +393,26 @@ class DB {
 
   async initializeDatabase() {
     try {
+      logger.log("info", "database", {
+        action: "initialize_database_start",
+        database: config.db.connection.database,
+      });
+
       const connection = await this._getConnection(false);
       try {
         const dbExists = await this.checkDatabaseExists(connection);
-        console.log(dbExists ? "Database exists" : "Database does not exist");
 
-        await connection.query(
-          `CREATE DATABASE IF NOT EXISTS ${config.db.connection.database}`
-        );
+        await connection.query(`CREATE DATABASE IF NOT EXISTS ${config.db.connection.database}`);
         await connection.query(`USE ${config.db.connection.database}`);
 
         for (const statement of dbModel.tableCreateStatements) {
           await connection.query(statement);
         }
+
+        logger.log("info", "database", {
+          action: "create_database",
+          databaseExists: dbExists ? "Database Already Exists" : "Created new Database",
+        });
 
         if (!dbExists) {
           const defaultAdmin = {
@@ -449,13 +427,10 @@ class DB {
         connection.end();
       }
     } catch (err) {
-      console.error(
-        JSON.stringify({
-          message: "Error initializing database",
-          exception: err.message,
-          connection: config.db.connection,
-        })
-      );
+      logger.log("error", "database", {
+        action: "initialize_database_error",
+        error: err.message,
+      });
     }
   }
 
@@ -465,30 +440,27 @@ class DB {
       try {
         // Check if the database exists
         const dbExists = await this.checkDatabaseExists(connection);
-        console.log(dbExists ? "Database exists" : "Database does not exist");
 
         // If the database exists, drop it
         if (dbExists) {
-          await connection.query(
-            `DROP DATABASE ${config.db.connection.database}`
-          );
-          console.log(
-            `Database ${config.db.connection.database} has been deleted.`
-          );
+          await connection.query(`DROP DATABASE ${config.db.connection.database}`);
+          logger.log("info", "database", {
+            action: "database_deleted",
+            database: config.db.connection.database,
+          });
         } else {
-          console.log("No database to delete.");
+          logger.log("info", "database", {
+            action: "no_database_to_delete",
+          });
         }
       } finally {
         connection.end();
       }
     } catch (err) {
-      console.error(
-        JSON.stringify({
-          message: "Error deleting database",
-          exception: err.message,
-          connection: config.db.connection,
-        })
-      );
+      logger.log("error", "database", {
+        action: "delete_database_error",
+        error: err.message,
+      });
     }
   }
 

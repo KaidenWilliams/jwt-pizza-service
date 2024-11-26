@@ -5,9 +5,14 @@ const franchiseRouter = require("./routes/franchiseRouter.js");
 const version = require("./version.json");
 const config = require("./config.js");
 const metrics = require("./metrics.js");
+const logger = require("./logger.js");
 
 const app = express();
 app.use(express.json());
+
+// TODO: where should this go?
+app.use(logger.httpLogger);
+
 app.use(setAuthUser);
 
 // Latency Middleware
