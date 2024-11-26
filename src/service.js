@@ -10,7 +10,7 @@ const logger = require("./logger.js");
 const app = express();
 app.use(express.json());
 
-// TODO: where should this go?
+// Logging Middleware
 app.use(logger.httpLogger);
 
 app.use(setAuthUser);
@@ -37,7 +37,7 @@ app.use((req, res, next) => {
   next();
 });
 
-// Logging Middleware
+// Metrics logging middlewar
 app.use((req, res, next) => {
   metrics.logHTTPRequest(req);
   next();
