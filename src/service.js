@@ -7,13 +7,15 @@ const config = require("./config.js");
 const metrics = require("./metrics.js");
 const logger = require("./logger.js");
 
-// HOPEFULLY WILL PREVENT THE CHASO INJECTION
+const app = express();
+
 function preventChaosInjection(req, res, next) {
   try {
     const decodedPath = decodeURIComponent(req.path);
 
+    // Check
     if (
-      !/^\/[a-zA-Z0-9_\-\/\.]*$/.test(decodedPath) ||
+      !/^\/[a-zA-Z0-9_\-/.]*$/.test(decodedPath) ||
       decodedPath.includes("%") ||
       decodedPath.includes("\0") ||
       decodedPath.length > 2000
@@ -51,11 +53,7 @@ function preventChaosInjection(req, res, next) {
 
 app.use(preventChaosInjection);
 
-app.use(
-  express.json({
-    limit: "10kb",
-  })
-);
+app.use(express.json());
 
 // Logging Middleware
 app.use(logger.httpLogger);
