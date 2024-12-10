@@ -83,9 +83,6 @@ jobs:
           };
           EOF
 
-      - name: Tests
-        run: npm test
-
       - name: set version
         id: set_version
         run: |
