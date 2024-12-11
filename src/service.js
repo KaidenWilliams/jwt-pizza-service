@@ -5,58 +5,10 @@ const franchiseRouter = require("./routes/franchiseRouter.js");
 const version = require("./version.json");
 const config = require("./config.js");
 const metrics = require("./metrics.js");
-const logger = require("./logger.js");
 
 const app = express();
 
-function preventChaosInjection(req, res, next) {
-  try {
-    const decodedPath = decodeURIComponent(req.path);
-
-    // Check
-    if (
-      !/^\/[a-zA-Z0-9_\-/.]*$/.test(decodedPath) ||
-      decodedPath.includes("%") ||
-      decodedPath.includes("\0") ||
-      decodedPath.length > 2000
-    ) {
-      logger.warn("Chaos Attempt Detected", {
-        originalPath: req.path,
-        decodedPath: decodedPath,
-        method: req.method,
-        sourceIP: req.ip,
-        timestamp: new Date().toISOString(),
-      });
-
-      metrics.recordChaosIncident("url_encoding");
-
-      return res.status(400).json({
-        status: "rejected",
-        reason: "Invalid request path",
-        timestamp: new Date().toISOString(),
-      });
-    }
-
-    next();
-  } catch (error) {
-    logger.error("Path Decoding Error", {
-      error: error.message,
-      path: req.path,
-    });
-
-    res.status(400).json({
-      status: "error",
-      message: "Invalid request path encoding",
-    });
-  }
-}
-
-app.use(preventChaosInjection);
-
 app.use(express.json());
-
-// Logging Middleware
-app.use(logger.httpLogger);
 
 app.use(setAuthUser);
 
